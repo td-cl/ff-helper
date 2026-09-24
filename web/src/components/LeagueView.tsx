@@ -10,6 +10,7 @@ import { useTrendingPlayers } from "../hooks/useTrendingPlayers";
 import { buildBidHistory, suggestBid } from "../lib/bidEngine";
 import { computePositionalNeeds, slotSettingsFromRosterPositions } from "../lib/positionalNeed";
 import { computeReplacementLevels, valueOverReplacement } from "../lib/replacementValue";
+import { buildSlottedRoster } from "../lib/rosterSlots";
 import { suggestTrades, type RosterInfo } from "../lib/tradeFinder";
 import { RosterCard } from "./RosterCard";
 import { TradeSuggestionCard } from "./TradeSuggestionCard";
@@ -22,7 +23,10 @@ interface Props {
   onBack: () => void;
 }
 
-type Tab = "roster" | "waivers" | "trades";
+type Tab = "roster" | "waivers" | "trending" | "trades";
+
+const TRENDING_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"];
+const TOP_N_PER_POSITION = 20;
 
 function countStartingQbs(rosterPositions: string[]): number {
   return rosterPositions.filter((p) => p === "QB" || p === "SUPER_FLEX").length || 1;
@@ -71,7 +75,10 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
     [values, league],
   );
 
-  const waiverTargets: WaiverTarget[] = useMemo(() => {
+  // Every trending-add player who's actually available in this league,
+  // priced and valued - the shared base both the curated Waiver Targets
+  // list and the browsable per-position Trending board are built from.
+  const availableCandidates: WaiverTarget[] = useMemo(() => {
     return trendingAdds
       .filter((t) => !rosteredIds.has(t.player_id) && values.has(t.player_id))
       .map((t) => {
@@ -79,13 +86,33 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
         const bid = suggestBid(value.value, bidHistory, budgetRemaining, budgetTotal);
         const valueAdd = valueOverReplacement(value, replacementLevels);
         return { playerId: t.player_id, value, trendingCount: t.count, bid, valueAdd };
-      })
+      });
+  }, [trendingAdds, rosteredIds, values, bidHistory, budgetRemaining, budgetTotal, replacementLevels]);
+
+  const waiverTargets: WaiverTarget[] = useMemo(
+    () =>
       // Ranked by value ABOVE replacement, not raw value - raw points
       // structurally favor whichever position scores the most (QB/K),
       // regardless of how deep that position actually runs.
-      .sort((a, b) => b.valueAdd - a.valueAdd)
-      .slice(0, 25);
-  }, [trendingAdds, rosteredIds, values, bidHistory, budgetRemaining, budgetTotal, replacementLevels]);
+      [...availableCandidates].sort((a, b) => b.valueAdd - a.valueAdd).slice(0, 25),
+    [availableCandidates],
+  );
+
+  // A wider browsable board: every trending-add option, grouped by
+  // position and ranked by raw trending add-count (Sleeper's own signal)
+  // rather than our computed value - a different, complementary view from
+  // the curated Waiver Targets list above.
+  const trendingByPosition = useMemo(
+    () =>
+      TRENDING_POSITIONS.map((position) => ({
+        position,
+        targets: availableCandidates
+          .filter((t) => t.value.position === position)
+          .sort((a, b) => b.trendingCount - a.trendingCount)
+          .slice(0, TOP_N_PER_POSITION),
+      })).filter((group) => group.targets.length > 0),
+    [availableCandidates],
+  );
 
   const myNeeds = useMemo(() => {
     if (!league || !myRoster) return [];
@@ -113,6 +140,16 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
     return suggestTrades(myRoster.players ?? [], leaguemateRosters, tradeValuesById, myNeeds, nameById);
   }, [myRoster, tradeValuesById, rosters, nameByRosterId, myNeeds]);
 
+  const slottedRoster = useMemo(() => {
+    if (!league || !myRoster) return null;
+    return buildSlottedRoster(
+      league.roster_positions,
+      myRoster.starters ?? [],
+      myRoster.players ?? [],
+      myRoster.reserve ?? [],
+    );
+  }, [league, myRoster]);
+
   if (leagueLoading || !league) {
     return <p className="loading">Loading league...</p>;
   }
@@ -138,6 +175,9 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
         <button className={tab === "waivers" ? "active" : ""} onClick={() => setTab("waivers")}>
           Waiver Targets
         </button>
+        <button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>
+          Trending
+        </button>
         <button className={tab === "trades" ? "active" : ""} onClick={() => setTab("trades")}>
           Trades
         </button>
@@ -148,6 +188,22 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
             <p className="loading">Loading waiver targets...</p>
           ) : (
             <WaiverTargetsTable targets={waiverTargets} week={nflState?.week ?? null} />
+          )}
+        </div>
+      )}
+      {tab === "trending" && (
+        <div className="panel">
+          {valuesLoading && trendingByPosition.length === 0 ? (
+            <p className="loading">Loading trending players...</p>
+          ) : trendingByPosition.length === 0 ? (
+            <p className="empty-row">No trending pickups available in this league right now.</p>
+          ) : (
+            trendingByPosition.map((group) => (
+              <div key={group.position} className="trending-position-group">
+                <h2 className="roster-section-header">{group.position}</h2>
+                <WaiverTargetsTable targets={group.targets} week={nflState?.week ?? null} />
+              </div>
+            ))
           )}
         </div>
       )}
@@ -172,12 +228,40 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
         <div className="panel">
           {valuesLoading && values.size === 0 ? (
             <p className="loading">Loading roster...</p>
-          ) : myRoster ? (
-            <ul className="roster-card-grid">
-              {(myRoster.players ?? []).map((id) => (
-                <RosterCard key={id} playerId={id} value={values.get(id)} week={nflState?.week ?? null} />
-              ))}
-            </ul>
+          ) : slottedRoster ? (
+            <>
+              <ul className="roster-card-grid">
+                {slottedRoster.starters.map((s, i) => (
+                  <RosterCard
+                    key={`${s.playerId}-${i}`}
+                    playerId={s.playerId}
+                    value={values.get(s.playerId)}
+                    week={nflState?.week ?? null}
+                    slot={s.slot}
+                  />
+                ))}
+              </ul>
+              {slottedRoster.bench.length > 0 && (
+                <>
+                  <h2 className="roster-section-header">Bench</h2>
+                  <ul className="roster-card-grid">
+                    {slottedRoster.bench.map((id) => (
+                      <RosterCard key={id} playerId={id} value={values.get(id)} week={nflState?.week ?? null} />
+                    ))}
+                  </ul>
+                </>
+              )}
+              {slottedRoster.ir.length > 0 && (
+                <>
+                  <h2 className="roster-section-header">IR</h2>
+                  <ul className="roster-card-grid">
+                    {slottedRoster.ir.map((id) => (
+                      <RosterCard key={id} playerId={id} value={values.get(id)} week={nflState?.week ?? null} />
+                    ))}
+                  </ul>
+                </>
+              )}
+            </>
           ) : (
             <p className="empty-row">Couldn't find your roster in this league.</p>
           )}

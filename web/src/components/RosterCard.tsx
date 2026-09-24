@@ -5,9 +5,13 @@ interface Props {
   playerId: string;
   value: PlayerValueEntry | undefined;
   week: number | null;
+  /** The roster slot this player fills (e.g. "FLEX", "SUPER_FLEX") - shown
+   * as a second badge only when it differs from the player's own position,
+   * so a flexed RB reads "RB · FLEX" instead of a redundant "RB · RB". */
+  slot?: string;
 }
 
-export function RosterCard({ playerId, value, week }: Props) {
+export function RosterCard({ playerId, value, week, slot }: Props) {
   if (!value) {
     return (
       <li className="roster-card roster-card-unknown">
@@ -18,11 +22,19 @@ export function RosterCard({ playerId, value, week }: Props) {
 
   const onBye = value.opponent == null;
   const hurt = value.injuryStatus && value.injuryStatus !== "Questionable";
+  const showSlot = slot && slot !== value.position;
+  // FLEX/SUPER_FLEX/WRRB_FLEX/etc. all read as the same purple "FLEX" tag.
+  const slotColorKey = showSlot ? (slot.includes("FLEX") ? "FLEX" : slot) : null;
 
   return (
     <li className="roster-card">
       <div className="roster-card-header">
-        <span className={`pos-badge ${positionClass(value.position)}`}>{value.position}</span>
+        <span className="roster-card-badges">
+          <span className={`pos-badge ${positionClass(value.position)}`}>{value.position}</span>
+          {showSlot && slotColorKey && (
+            <span className={`pos-badge ${positionClass(slotColorKey)}`}>{slot}</span>
+          )}
+        </span>
         {value.positionRank != null && (
           <span className="season-rank-tag">
             {value.position}
