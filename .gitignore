@@ -1,0 +1,14 @@
+data-prep/.venv/
+data-prep/cache/
+data-prep/__pycache__/
+web/node_modules/
+web/dist/
+web/public/player_pool.json
+.DS_Store
+
+# Third-party data exports and local secrets
+data-prep/FantasyPros-expert-rankings.csv
+.env
+.env.*
+*.log
+__pycache__/
