@@ -256,6 +256,7 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack, onSwitchLeagu
                     value={values.get(s.playerId)}
                     week={nflState?.week ?? null}
                     slot={s.slot}
+                    rosRank={tradeValuesById.get(s.playerId)?.positionRank}
                   />
                 ))}
               </ul>
@@ -264,7 +265,13 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack, onSwitchLeagu
                   <h2 className="roster-section-header">Bench</h2>
                   <ul className="roster-card-grid">
                     {slottedRoster.bench.map((id) => (
-                      <RosterCard key={id} playerId={id} value={values.get(id)} week={nflState?.week ?? null} />
+                      <RosterCard
+                        key={id}
+                        playerId={id}
+                        value={values.get(id)}
+                        week={nflState?.week ?? null}
+                        rosRank={tradeValuesById.get(id)?.positionRank}
+                      />
                     ))}
                   </ul>
                 </>
@@ -274,7 +281,13 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack, onSwitchLeagu
                   <h2 className="roster-section-header">IR</h2>
                   <ul className="roster-card-grid">
                     {slottedRoster.ir.map((id) => (
-                      <RosterCard key={id} playerId={id} value={values.get(id)} week={nflState?.week ?? null} />
+                      <RosterCard
+                        key={id}
+                        playerId={id}
+                        value={values.get(id)}
+                        week={nflState?.week ?? null}
+                        rosRank={tradeValuesById.get(id)?.positionRank}
+                      />
                     ))}
                   </ul>
                 </>

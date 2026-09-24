@@ -8,29 +8,29 @@ export interface PlayerValueEntry extends PlayerValue {
   team: string | null;
   opponent: string | null;
   injuryStatus: string | null;
-  /** 1-based rank among every player at this position by season-long total
-   * points (e.g. 4 for the position's #4 scorer, shown as "QB4") - null
-   * for a player who hasn't played a game yet this season. */
-  positionRank: number | null;
+  /** 1-based rank among every player at this position by this week's
+   * value (the same number shown as "Wk N proj" on roster cards) - null
+   * for a player on a bye, who has no real projection to rank. */
+  weekRank: number | null;
 }
 
 const RANKED_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
-/** Ranks every player within their position by season-long total points -
- * mutates each entry in place since the index was just built fresh here
- * and nothing else holds a reference to it yet. */
-function assignPositionalRanks(index: Map<string, PlayerValueEntry>): void {
+/** Ranks every playing-this-week player within their position by this
+ * week's value - mutates each entry in place since the index was just
+ * built fresh here and nothing else holds a reference to it yet. */
+function assignWeekRanks(index: Map<string, PlayerValueEntry>): void {
   const byPosition = new Map<string, PlayerValueEntry[]>();
   for (const entry of index.values()) {
-    if (entry.seasonTotal == null || !RANKED_POSITIONS.includes(entry.position)) continue;
+    if (entry.opponent == null || !RANKED_POSITIONS.includes(entry.position)) continue;
     const list = byPosition.get(entry.position) ?? [];
     list.push(entry);
     byPosition.set(entry.position, list);
   }
   for (const entries of byPosition.values()) {
-    entries.sort((a, b) => b.seasonTotal! - a.seasonTotal!);
+    entries.sort((a, b) => b.value - a.value);
     entries.forEach((entry, i) => {
-      entry.positionRank = i + 1;
+      entry.weekRank = i + 1;
     });
   }
 }
@@ -84,7 +84,7 @@ export function buildPlayerValueIndex(
       team: proj.team,
       opponent: proj.opponent,
       injuryStatus: proj.player.injury_status,
-      positionRank: null,
+      weekRank: null,
     });
   }
 
@@ -109,10 +109,10 @@ export function buildPlayerValueIndex(
       team: last.team,
       opponent: null,
       injuryStatus: last.player.injury_status,
-      positionRank: null,
+      weekRank: null,
     });
   }
 
-  assignPositionalRanks(index);
+  assignWeekRanks(index);
   return index;
 }

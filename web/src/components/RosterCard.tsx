@@ -9,9 +9,12 @@ interface Props {
    * as a second badge only when it differs from the player's own position,
    * so a flexed RB reads "RB · FLEX" instead of a redundant "RB · RB". */
   slot?: string;
+  /** Rest-of-season position rank (FantasyCalc redraft value rank) -
+   * absent for players FantasyCalc doesn't value (deep bench, K/DEF). */
+  rosRank?: number | null;
 }
 
-export function RosterCard({ playerId, value, week, slot }: Props) {
+export function RosterCard({ playerId, value, week, slot, rosRank }: Props) {
   if (!value) {
     return (
       <li className="roster-card roster-card-unknown">
@@ -35,12 +38,20 @@ export function RosterCard({ playerId, value, week, slot }: Props) {
             <span className={`pos-badge ${positionClass(slotColorKey)}`}>{slot}</span>
           )}
         </span>
-        {value.positionRank != null && (
-          <span className="season-rank-tag">
-            {value.position}
-            {value.positionRank}
-          </span>
-        )}
+        <span className="rank-tags">
+          {value.weekRank != null && (
+            <span className="rank-tag" title={`Rank at ${value.position} for week ${week}`}>
+              <span className="rank-tag-label">Wk</span> {value.position}
+              {value.weekRank}
+            </span>
+          )}
+          {rosRank != null && (
+            <span className="rank-tag" title={`Rest-of-season rank at ${value.position}`}>
+              <span className="rank-tag-label">ROS</span> {value.position}
+              {rosRank}
+            </span>
+          )}
+        </span>
       </div>
       <span className="roster-card-name">{value.name}</span>
       <span className="dim">{value.team ?? "FA"}</span>

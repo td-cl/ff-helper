@@ -45,11 +45,6 @@ export interface PlayerValue {
   value: number;
   recentAvg: number | null;
   seasonAvg: number | null;
-  /** Sum of custom-scored points across every completed week played -
-   * null until the player has played at least one game. Drives the
-   * season-long positional rank shown on roster cards (see
-   * lib/playerValuesIndex.ts's assignPositionalRanks). */
-  seasonTotal: number | null;
   /** recentAvg - seasonAvg, surfaced separately for a UI trend arrow -
    * never folded silently into `value`. */
   trendDelta: number | null;
@@ -70,8 +65,7 @@ export function computePlayerValue(params: ComputePlayerValueParams): PlayerValu
   const { playerId, allSeasonWeeks, nextWeekProjection, scoringSettings, matchupMultiplier } = params;
 
   const weekScores = allSeasonWeeks.map((week) => scoreStatLine(week, scoringSettings));
-  const seasonTotal = weekScores.length > 0 ? Math.round(weekScores.reduce((a, b) => a + b, 0) * 100) / 100 : null;
-  const seasonAvg = weekScores.length > 0 ? seasonTotal! / weekScores.length : null;
+  const seasonAvg = weekScores.length > 0 ? weekScores.reduce((a, b) => a + b, 0) / weekScores.length : null;
 
   const recentMostRecentFirst = [...weekScores].slice(-3).reverse();
   const recentAvg = weightedAverage(recentMostRecentFirst);
@@ -82,5 +76,5 @@ export function computePlayerValue(params: ComputePlayerValueParams): PlayerValu
   const value = Math.round(projectedPoints * matchupMultiplier * 100) / 100;
   const trendDelta = recentAvg != null && seasonAvg != null ? Math.round((recentAvg - seasonAvg) * 100) / 100 : null;
 
-  return { playerId, projectedPoints, matchupMultiplier, value, recentAvg, seasonAvg, seasonTotal, trendDelta };
+  return { playerId, projectedPoints, matchupMultiplier, value, recentAvg, seasonAvg, trendDelta };
 }
