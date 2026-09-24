@@ -8,9 +8,10 @@ import { useSeasonPlayerValues } from "../hooks/useSeasonPlayerValues";
 import { useTradeValues } from "../hooks/useTradeValues";
 import { useTrendingPlayers } from "../hooks/useTrendingPlayers";
 import { buildBidHistory, suggestBid } from "../lib/bidEngine";
-import { positionClass } from "../lib/positionColors";
 import { computePositionalNeeds, slotSettingsFromRosterPositions } from "../lib/positionalNeed";
+import { computeReplacementLevels, valueOverReplacement } from "../lib/replacementValue";
 import { suggestTrades, type RosterInfo } from "../lib/tradeFinder";
+import { RosterCard } from "./RosterCard";
 import { TradeSuggestionCard } from "./TradeSuggestionCard";
 import { WaiverTargetsTable, type WaiverTarget } from "./WaiverTargetsTable";
 
@@ -21,14 +22,14 @@ interface Props {
   onBack: () => void;
 }
 
-type Tab = "waivers" | "trades" | "roster";
+type Tab = "roster" | "waivers" | "trades";
 
 function countStartingQbs(rosterPositions: string[]): number {
   return rosterPositions.filter((p) => p === "QB" || p === "SUPER_FLEX").length || 1;
 }
 
 export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
-  const [tab, setTab] = useState<Tab>("waivers");
+  const [tab, setTab] = useState<Tab>("roster");
   const { league, loading: leagueLoading } = useLeague(leagueId);
   const { data: rosters } = useLeagueRosters(leagueId);
   const { data: users } = useLeagueUsers(leagueId);
@@ -65,17 +66,26 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
   const budgetUsed = myRoster?.settings.waiver_budget_used ?? 0;
   const budgetRemaining = budgetTotal - budgetUsed;
 
+  const replacementLevels = useMemo(
+    () => (league ? computeReplacementLevels(values, league.roster_positions, league.total_rosters) : new Map()),
+    [values, league],
+  );
+
   const waiverTargets: WaiverTarget[] = useMemo(() => {
     return trendingAdds
       .filter((t) => !rosteredIds.has(t.player_id) && values.has(t.player_id))
       .map((t) => {
         const value = values.get(t.player_id)!;
         const bid = suggestBid(value.value, bidHistory, budgetRemaining, budgetTotal);
-        return { playerId: t.player_id, value, trendingCount: t.count, bid };
+        const valueAdd = valueOverReplacement(value, replacementLevels);
+        return { playerId: t.player_id, value, trendingCount: t.count, bid, valueAdd };
       })
-      .sort((a, b) => b.value.value - a.value.value)
+      // Ranked by value ABOVE replacement, not raw value - raw points
+      // structurally favor whichever position scores the most (QB/K),
+      // regardless of how deep that position actually runs.
+      .sort((a, b) => b.valueAdd - a.valueAdd)
       .slice(0, 25);
-  }, [trendingAdds, rosteredIds, values, bidHistory, budgetRemaining, budgetTotal]);
+  }, [trendingAdds, rosteredIds, values, bidHistory, budgetRemaining, budgetTotal, replacementLevels]);
 
   const myNeeds = useMemo(() => {
     if (!league || !myRoster) return [];
@@ -117,18 +127,19 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
       </div>
       <h1>{league.name}</h1>
       <p className="dim">
-        FAAB remaining: ${budgetRemaining} / ${budgetTotal}
+        {nflState && <span className="week-badge">Week {nflState.week}</span>} FAAB remaining: $
+        {budgetRemaining} / ${budgetTotal}
         {myRoster && ` · ${myRoster.settings.wins ?? 0}-${myRoster.settings.losses ?? 0}`}
       </p>
       <div className="tab-bar">
+        <button className={tab === "roster" ? "active" : ""} onClick={() => setTab("roster")}>
+          Roster
+        </button>
         <button className={tab === "waivers" ? "active" : ""} onClick={() => setTab("waivers")}>
           Waiver Targets
         </button>
         <button className={tab === "trades" ? "active" : ""} onClick={() => setTab("trades")}>
           Trades
-        </button>
-        <button className={tab === "roster" ? "active" : ""} onClick={() => setTab("roster")}>
-          Roster
         </button>
       </div>
       {tab === "waivers" && (
@@ -136,7 +147,7 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
           {valuesLoading && waiverTargets.length === 0 ? (
             <p className="loading">Loading waiver targets...</p>
           ) : (
-            <WaiverTargetsTable targets={waiverTargets} />
+            <WaiverTargetsTable targets={waiverTargets} week={nflState?.week ?? null} />
           )}
         </div>
       )}
@@ -159,23 +170,13 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
       )}
       {tab === "roster" && (
         <div className="panel">
-          {myRoster ? (
-            <ul className="league-roster-list">
-              {(myRoster.players ?? []).map((id) => {
-                const v = values.get(id);
-                return (
-                  <li key={id}>
-                    {v ? (
-                      <>
-                        <span className={`pos-badge ${positionClass(v.position)}`}>{v.position}</span> {v.name}
-                        <span className="dim"> · {v.value.toFixed(1)} pts</span>
-                      </>
-                    ) : (
-                      id
-                    )}
-                  </li>
-                );
-              })}
+          {valuesLoading && values.size === 0 ? (
+            <p className="loading">Loading roster...</p>
+          ) : myRoster ? (
+            <ul className="roster-card-grid">
+              {(myRoster.players ?? []).map((id) => (
+                <RosterCard key={id} playerId={id} value={values.get(id)} week={nflState?.week ?? null} />
+              ))}
             </ul>
           ) : (
             <p className="empty-row">Couldn't find your roster in this league.</p>

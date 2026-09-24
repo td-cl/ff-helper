@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getUserLeagues } from "../api/sleeper";
 import { useLeagueRosters } from "../hooks/useLeagueRosters";
 import type { NflWeekState } from "../hooks/useNflState";
 import { useSeasonPlayerValues } from "../hooks/useSeasonPlayerValues";
 import { useTrendingPlayers } from "../hooks/useTrendingPlayers";
+import { computeReplacementLevels, valueOverReplacement } from "../lib/replacementValue";
 import type { SleeperLeague } from "../types";
 
 interface Props {
@@ -38,10 +39,16 @@ function LeagueSummaryCard({
   const budgetRemaining = budgetTotal - budgetUsed;
 
   const rosteredIds = new Set(rosters.flatMap((r) => r.players ?? []));
+  const replacementLevels = useMemo(
+    () => computeReplacementLevels(values, league.roster_positions, league.total_rosters),
+    [values, league.roster_positions, league.total_rosters],
+  );
+  // Ranked by value over replacement, not raw points - raw points
+  // structurally favor whichever position scores the most (QB/K).
   const topTargetValue = trendingAdds
     .filter((t) => !rosteredIds.has(t.player_id) && values.has(t.player_id))
     .map((t) => values.get(t.player_id)!)
-    .sort((a, b) => b.value - a.value)[0];
+    .sort((a, b) => valueOverReplacement(b, replacementLevels) - valueOverReplacement(a, replacementLevels))[0];
 
   return (
     <li className="league-summary-card">
@@ -98,6 +105,7 @@ export function SeasonDashboard({ myUserId, nflState, onOpenLeague, onBack }: Pr
         </button>
       </div>
       <h1>Season Dashboard</h1>
+      {nflState && <p className="dim week-badge">Week {nflState.week}</p>}
       {error && <p className="error-text">{error}</p>}
       {leagues == null && !error && <p className="loading">Loading your leagues...</p>}
       {leagues != null && leagues.length === 0 && <p className="empty-row">No in-season leagues found.</p>}

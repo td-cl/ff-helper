@@ -854,11 +854,72 @@ tr.recommended-row.value-row {
   color: var(--text-dim);
 }
 
-.league-roster-list {
+.week-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  margin-right: 8px;
+}
+
+.value-add-positive {
+  color: var(--need);
+  font-weight: 600;
+}
+
+.roster-card-grid {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.roster-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+}
+
+.roster-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.roster-card-name {
+  font-weight: 600;
+}
+
+.roster-card-week {
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.season-rank-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.injury-tag {
+  align-self: flex-start;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--error-bg);
+  color: var(--error);
 }

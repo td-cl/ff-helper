@@ -8,6 +8,31 @@ export interface PlayerValueEntry extends PlayerValue {
   team: string | null;
   opponent: string | null;
   injuryStatus: string | null;
+  /** 1-based rank among every player at this position by season-long total
+   * points (e.g. 4 for the position's #4 scorer, shown as "QB4") - null
+   * for a player who hasn't played a game yet this season. */
+  positionRank: number | null;
+}
+
+const RANKED_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"];
+
+/** Ranks every player within their position by season-long total points -
+ * mutates each entry in place since the index was just built fresh here
+ * and nothing else holds a reference to it yet. */
+function assignPositionalRanks(index: Map<string, PlayerValueEntry>): void {
+  const byPosition = new Map<string, PlayerValueEntry[]>();
+  for (const entry of index.values()) {
+    if (entry.seasonTotal == null || !RANKED_POSITIONS.includes(entry.position)) continue;
+    const list = byPosition.get(entry.position) ?? [];
+    list.push(entry);
+    byPosition.set(entry.position, list);
+  }
+  for (const entries of byPosition.values()) {
+    entries.sort((a, b) => b.seasonTotal! - a.seasonTotal!);
+    entries.forEach((entry, i) => {
+      entry.positionRank = i + 1;
+    });
+  }
 }
 
 /**
@@ -59,6 +84,7 @@ export function buildPlayerValueIndex(
       team: proj.team,
       opponent: proj.opponent,
       injuryStatus: proj.player.injury_status,
+      positionRank: null,
     });
   }
 
@@ -83,8 +109,10 @@ export function buildPlayerValueIndex(
       team: last.team,
       opponent: null,
       injuryStatus: last.player.injury_status,
+      positionRank: null,
     });
   }
 
+  assignPositionalRanks(index);
   return index;
 }
