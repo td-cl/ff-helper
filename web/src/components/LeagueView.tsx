@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useInSeasonLeagues } from "../hooks/useInSeasonLeagues";
 import { useLeague } from "../hooks/useLeague";
 import { useLeagueRosters } from "../hooks/useLeagueRosters";
 import { useLeagueTransactions } from "../hooks/useLeagueTransactions";
@@ -21,6 +22,7 @@ interface Props {
   myUserId: string;
   nflState: NflWeekState | null;
   onBack: () => void;
+  onSwitchLeague: (leagueId: string) => void;
 }
 
 type Tab = "roster" | "waivers" | "trending" | "trades";
@@ -32,9 +34,10 @@ function countStartingQbs(rosterPositions: string[]): number {
   return rosterPositions.filter((p) => p === "QB" || p === "SUPER_FLEX").length || 1;
 }
 
-export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
+export function LeagueView({ leagueId, myUserId, nflState, onBack, onSwitchLeague }: Props) {
   const [tab, setTab] = useState<Tab>("roster");
   const { league, loading: leagueLoading } = useLeague(leagueId);
+  const { leagues: allLeagues } = useInSeasonLeagues(myUserId);
   const { data: rosters } = useLeagueRosters(leagueId);
   const { data: users } = useLeagueUsers(leagueId);
   const { data: transactions } = useLeagueTransactions(leagueId, nflState?.week ?? 0);
@@ -162,7 +165,22 @@ export function LeagueView({ leagueId, myUserId, nflState, onBack }: Props) {
           ← Dashboard
         </button>
       </div>
-      <h1>{league.name}</h1>
+      {allLeagues && allLeagues.length > 1 ? (
+        <select
+          className="league-switcher"
+          value={league.league_id}
+          onChange={(e) => onSwitchLeague(e.target.value)}
+          aria-label="Switch league"
+        >
+          {allLeagues.map((l) => (
+            <option key={l.league_id} value={l.league_id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <h1>{league.name}</h1>
+      )}
       <p className="dim">
         {nflState && <span className="week-badge">Week {nflState.week}</span>} FAAB remaining: $
         {budgetRemaining} / ${budgetTotal}

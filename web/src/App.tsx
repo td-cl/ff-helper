@@ -155,6 +155,7 @@ function App() {
         myUserId={myUserId}
         nflState={nflState}
         onBack={() => setSeasonView(null)}
+        onSwitchLeague={(leagueId) => setSeasonView({ type: "league", leagueId })}
       />
     );
   }

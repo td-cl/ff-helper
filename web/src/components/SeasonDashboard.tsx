@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { getUserLeagues } from "../api/sleeper";
+import { useMemo } from "react";
+import { useInSeasonLeagues } from "../hooks/useInSeasonLeagues";
 import { useLeagueRosters } from "../hooks/useLeagueRosters";
 import type { NflWeekState } from "../hooks/useNflState";
 import { useSeasonPlayerValues } from "../hooks/useSeasonPlayerValues";
@@ -79,22 +79,7 @@ function LeagueSummaryCard({
 }
 
 export function SeasonDashboard({ myUserId, nflState, onOpenLeague, onBack }: Props) {
-  const [leagues, setLeagues] = useState<SleeperLeague[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    getUserLeagues(myUserId, String(new Date().getFullYear()))
-      .then((result) => {
-        if (!cancelled) setLeagues(result.filter((l) => l.status === "in_season"));
-      })
-      .catch(() => {
-        if (!cancelled) setError("Couldn't load your leagues from Sleeper.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [myUserId]);
+  const { leagues, error } = useInSeasonLeagues(myUserId);
 
   return (
     <div className="season-dashboard">
